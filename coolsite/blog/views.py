@@ -1,5 +1,5 @@
 from django.http import HttpResponse, HttpResponseNotFound, Http404
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from .models import  *
 
 menue = [
@@ -42,8 +42,17 @@ def login(request):
 def pageNotFound(request, exception):
     return HttpResponseNotFound(f"Sorry page not found:(")  # Page 404
 
-def show_post(request, post_id):
-    return HttpResponse(f"News about = {post_id}")
+def show_post(request, post_slug):
+    post = get_object_or_404(News, slug=post_slug)
+
+    context = {
+        'post': post,
+        'menu': menue,
+        'title': post.title,
+        'cat_selected': post.cat_id,
+    }
+
+    return render(request, "blog/post.html", context=context)
 
 def show_category(request, cat_id):
     posts = News.objects.filter(cat_id=cat_id)
