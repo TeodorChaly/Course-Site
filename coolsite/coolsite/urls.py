@@ -21,7 +21,7 @@ from coolsite import settings
 from blog.views import *
 
 urlpatterns = [
-    path('', index),
+    path('', NewsHome.as_view()),
     path('admin/', admin.site.urls),
     path('', include(('blog.urls')))
 ]
