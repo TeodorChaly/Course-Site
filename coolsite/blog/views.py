@@ -1,33 +1,30 @@
+from django.contrib.auth import logout, login
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.views import LoginView
+from django.core.paginator import Paginator
 from django.http import HttpResponse, HttpResponseNotFound, Http404
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 
 from .forms import *
 from .models import  *
-
-menue = [
-    {'title': 'About', 'url_name': 'about'},
-    {'title': 'Add blog', 'url_name': 'add_page'},
-    {'title': 'Feedback', 'url_name': 'contact'},
-    {'title': 'Join', 'url_name': 'login'},
+from .utils import *
 
 
-]
-
-class NewsHome(ListView):
+class NewsHome(DataMixin ,ListView):
+    paginate_by = 3
     model = News
     template_name = "blog/index.html"
     context_object_name = 'posts'
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['menu'] = menue
-        context['title'] = "Main page"
-        context['cat_selected'] = 0
-
-        return context
+        c_def = self.get_user_context(title="Main page  ")
+        return dict(list(context.items()) + list(c_def.items()))
 
     def get_queryset(self):
         return News.objects.filter(is_published = True)
@@ -42,20 +39,28 @@ class NewsHome(ListView):
 #     return render(request, 'blog/index.html', context =context)
 #
 
+
 def about(request):
-    return render(request, 'blog/about.html', {"menu": menue, 'title': "About site"})
+    contact_list = News.objects.all()
+    paginator = Paginator(contact_list, 3)
+
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'blog/about.html', {'page_obj': page_obj, 'menu': menu, 'title': 'About site '})
 
 
-class AddPage(CreateView):
+class AddPage(LoginRequiredMixin,  DataMixin,CreateView):
     form_class = AddPostForm
     template_name = 'blog/addpage.html'
     success_url = reverse_lazy('home')
+    login_url = reverse_lazy("home")
+    raise_exception = True
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = "Add blog"
-        context['menu'] = menue
-        return context
+        c_def = self.get_user_context(title="Add page")
+        return dict(list(context.items()) + list(c_def.items()))
+
 # def addpage(request)  :
 #     if request.method == 'POST':
 #         form = AddPostForm(request.POST, request.FILES )
@@ -74,8 +79,8 @@ def contact(request):
     return HttpResponse("Feedback")
 
 
-def login(request):
-    return HttpResponse("Join")
+# def login(request):
+#     return HttpResponse("Join")
 
 
 def pageNotFound(request, exception):
@@ -94,7 +99,7 @@ def pageNotFound(request, exception):
 #
 #     return render(request, "blog/post.html", context=context)
 
-class ShowPost(DetailView):
+class ShowPost(DataMixin,DetailView):
     model = News
     template_name = 'blog/post.html'
     slug_url_kwarg = 'post_slug'
@@ -102,11 +107,11 @@ class ShowPost(DetailView):
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = context['post']
-        context['menu'] = menue
-        return context
+        c_def = self.get_user_context(title="Add blog")
+        return dict(list(context.items()) + list(c_def.items()))
 
-class NewsCategory(ListView):
+class NewsCategory(DataMixin,ListView):
+    paginate_by = 3
     model = News
     template_name = "blog/index.html"
     context_object_name = 'posts'
@@ -117,11 +122,9 @@ class NewsCategory(ListView):
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = "Category -"+ str(context['posts'][0].cat)
-        context['menu'] = menue
-        context['cat_selected'] = context['posts'][0].cat_id
-
-        return context
+        c_def = self.get_user_context(title='Категория - ' + str(context['posts'][0].cat),
+                                      cat_selected=context['posts'][0].cat_id)
+        return dict(list(context.items()) + list(c_def.items()))
 
 # def show_category(request, cat_id):
 #     posts = News.objects.filter(cat_id=cat_id)
@@ -139,3 +142,34 @@ class NewsCategory(ListView):
 #     return render(request, 'blog/index.html', context=context)
 
 # Create your views here.
+
+class RegisterUser(DataMixin, CreateView):
+    form_class = RegisterUserForm
+    template_name = 'blog/register.html'
+    success_url = reverse_lazy('login')
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(**kwargs)
+        c_def = self.get_user_context(title="Registration")
+        return dict(list(context.items()) + list(c_def.items()))
+
+    def form_valid(self, form):
+        user = form.save()
+        login(self.request, user)
+        return redirect('home')
+
+class LoginUser(DataMixin, LoginView):
+    form_class = LoginUserForm
+    template_name = 'blog/login.html'
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(**kwargs)
+        c_def = self.get_user_context(title="Authorization")
+        return dict(list(context.items()) + list(c_def.items()))
+
+    def get_success_url(self):
+        return reverse_lazy('home')
+
+def logout_user(request):
+    logout(request)
+    return redirect('/login')
