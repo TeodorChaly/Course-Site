@@ -6,7 +6,7 @@ from django.core.paginator import Paginator
 from django.http import HttpResponse, HttpResponseNotFound, Http404
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, DetailView, CreateView
+from django.views.generic import ListView, DetailView, CreateView, FormView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 
@@ -16,7 +16,7 @@ from .utils import *
 
 
 class NewsHome(DataMixin ,ListView):
-    paginate_by = 3
+    # paginate_by = 10
     model = News
     template_name = "blog/index.html"
     context_object_name = 'posts'
@@ -27,7 +27,9 @@ class NewsHome(DataMixin ,ListView):
         return dict(list(context.items()) + list(c_def.items()))
 
     def get_queryset(self):
-        return News.objects.filter(is_published = True)
+        return News.objects.filter(is_published = True).select_related('cat')
+
+
 # def index(request):
 #     posts = News.objects.all()
 #
@@ -75,8 +77,21 @@ class AddPage(LoginRequiredMixin,  DataMixin,CreateView):
 #     return render(request, 'blog/addpage.html', {'form': form, 'menu': menue, 'title': 'Добавление статьи'})
 
 
-def contact(request):
-    return HttpResponse("Feedback")
+class ContactFromView(DataMixin ,FormView):
+    form_class = ContactForm
+    template_name = "blog/contact.html"
+    success_url = reverse_lazy('home')
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(**kwargs)
+        c_def = self.get_user_context(title="Feedback")
+        return dict(list(context.items()) + list(c_def.items()))
+
+    def form_valid(self, form):
+        print(form.cleaned_data)
+        return redirect('home')
+# def contact(request):
+#     return HttpResponse("Feedback")
 
 
 # def login(request):
@@ -111,19 +126,20 @@ class ShowPost(DataMixin,DetailView):
         return dict(list(context.items()) + list(c_def.items()))
 
 class NewsCategory(DataMixin,ListView):
-    paginate_by = 3
+    # paginate_by = 3
     model = News
     template_name = "blog/index.html"
     context_object_name = 'posts'
     allow_empty = False
 
     def get_queryset(self):
-        return News.objects.filter(cat__slug = self.kwargs['cat_slug'], is_published = True)
+        return News.objects.filter(cat__slug = self.kwargs['cat_slug'], is_published = True).select_related('cat')
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-        c_def = self.get_user_context(title='Категория - ' + str(context['posts'][0].cat),
-                                      cat_selected=context['posts'][0].cat_id)
+        c = Category.objects.get(slug = self.kwargs['cat_slug'])
+        c_def = self.get_user_context(title='Категория - ' + str(c.name),
+                                      cat_selected=c.pk)
         return dict(list(context.items()) + list(c_def.items()))
 
 # def show_category(request, cat_id):
